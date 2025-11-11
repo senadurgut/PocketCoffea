@@ -161,7 +161,7 @@ def analyze_parton_decays_flat_nomesons(parts_idx, children_idx,
 
 
 @njit
-def get_partons_provenance_ttHbb(pdgIds, array_builder):
+def get_partons_provenance_ttHbb(pdgIds, array_builder): #maybe change the name to get_partons_provenance_ttHbb_semileptonic? 
     """
     1=higgs,
     2=hadronic top bquark,
@@ -252,6 +252,73 @@ def get_partons_provenance_ttHbb(pdgIds, array_builder):
 
 #############################################################
 #############################################################
+
+
+def get_partons_provenance_ttHbb_fullyhadronic(pdgIds, array_builder):
+    
+    '''
+    This function assigns particle provenance (origin) for b-quarks in a fully hadronic ttH -> bb process,
+    additional quarks from     where the Higgs decays into two b-quarks, and both the top and anti-top quarks decay hadronically, producing
+W decays.
+
+1 = higgs
+2 = bquarks from top
+3 = bquarks from antitop
+4 = additional radiation
+5 = decay quarks from hadronic W (from top)
+6 = decay quarks from hadronic W (from antitop)
+'''
+    for ids in pdgIds:
+        from_part = [-1] * len(ids)
+        from_part[0] = 4 #first particle is additional radiation
+        from_part[1] = 3 # second particle is always b from antitop
+        from_part[2] = 2 # second particle is always b from antitop
+        from_part[-1] = 1 
+        from_part[-2] = 1 
+        if len(ids)==9:
+            top = []
+            antitop = []
+            hadr_top = []    
+            #antitop
+            #top 
+            #this whole part might not be needed as the top and antitop are always present in the same location in the list,
+            #but let's keep it for now
+            if ids[3] == -3 and ids[4] == 4: 
+                top += [3, 4]
+                isTop = True
+            if ids[3] == -3 and ids[4] == 2: 
+                top += [3, 4]
+                isTop = True
+            if ids[3] == -1 and ids[4] == 2: 
+                top += [3, 4]
+                isTop = True
+            if ids[3] == -1 and ids[4] == 4: 
+                top += [3, 4]
+                isTop = True
+        
+            if isTop:
+            # The first quark pair is coming from top
+                from_part[top[0]] = 5
+                from_part[top[1]] = 5
+                from_part[5] = 6
+                from_part[6] = 6
+                
+            else:
+                from_part[top[0]] = 6
+                from_part[top[1]] = 6
+                from_part[5] = 5
+                from_part[6] = 5
+    
+            from_part[7] = 1 
+            from_part[8] = 1
+        array_builder.begin_list()
+        for i in from_part:
+            array_builder.append(i)
+        array_builder.end_list()
+    return array_builder
+
+#############################################################
+############################################################
 
 
 @njit
