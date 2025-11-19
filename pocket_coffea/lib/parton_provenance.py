@@ -270,12 +270,12 @@ W decays.
 '''
     for ids in pdgIds:
         from_part = [-1] * len(ids)
-        from_part[0] = 4 #first particle is additional radiation
-        from_part[1] = 3 # second particle is always b from antitop
-        from_part[2] = 2 # second particle is always b from antitop
-        from_part[-1] = 1 
-        from_part[-2] = 1 
         if len(ids)==9:
+            from_part[0] = 4 #first particle is additional radiation
+            from_part[1] = 3 # second particle is always b from antitop
+            from_part[2] = 2 # second particle is always b from antitop
+            from_part[-1] = 1 
+            from_part[-2] = 1
             top = []
             antitop = []
             hadr_top = []    
