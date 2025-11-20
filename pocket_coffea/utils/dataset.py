@@ -151,7 +151,7 @@ class Sample:
         print(
             f">> Query for sample: {self.metadata['sample']},  das_name: {self.metadata['das_names']}"
         )
-        self.get_filelist()
+        self.has_valid_files = self.get_filelist()
 
     def get_filelist(self):
         '''Function to get the dataset filelist from DAS and from Rucio.
@@ -174,6 +174,7 @@ class Sample:
             )
             filesjson = r.json()
             invalid_list = []
+            files_found_for_this_das = 0
             for fj in filesjson:
                 if 'is_file_valid' not in fj.keys():
                     # print("fj=", fj)
@@ -189,8 +190,13 @@ class Sample:
                     self.fileslist_redirector.append(fj['logical_file_name'])
                     self.metadata["nevents"] += fj['event_count']
                     self.metadata["size"] += fj['file_size']
-            if len(self.fileslist_redirector) == 0:
-                raise Exception(f"Found 0 files for sample {self}!")
+                    files_found_for_this_das += 1
+            
+            # If no valid files found for this DAS name, continue to next DAS name
+            if files_found_for_this_das == 0:
+                print(f"\t WARNING: Found 0 valid files for DAS dataset {das_name}")
+                print(f"\t Continuing with next DAS dataset (if any)...")
+                continue
 
             if self.metadata.get("dbs_instance", "prod/global") == "prod/global":
                 # Now query rucio to get the concrete dataset passing the sites filtering options
@@ -202,6 +208,14 @@ class Sample:
                 files_replicas, sites = rucio.get_dataset_files_from_dbs(das_name, self.metadata["dbs_instance"])
                 
             self.fileslist_concrete += files_replicas
+        
+        # After processing all DAS names, check if we found any valid files
+        if len(self.fileslist_redirector) == 0:
+            print(f"\t WARNING: Found 0 valid files for sample {self} after processing all DAS datasets!")
+            print(f"\t This sample will be skipped.")
+            return False  # Return False to indicate this sample has no valid files
+        
+        return True  # Return True to indicate success
 
     # Function to build the sample dictionary
     def get_sample_dict(self, redirector=True, prefix="root://xrootd-cms.infn.it//"):
@@ -298,27 +312,37 @@ class Dataset:
                 kwargs = {"dbs_instance": scfg['dbs_instance']}
             else:
                 kwargs = {}
-            sample = Sample(
-                name=sname,
-                das_names=scfg["das_names"],
-                sample=self.sample,
-                metadata=scfg["metadata"],
-                sites_cfg=self.sites_cfg,
-                sort_replicas=self.sort_replicas,
-                **kwargs,
-            )
-            self.samples_obj.append(sample)
-
-            # Save redirector
-            self.sample_dict_redirector.update(sample.get_sample_dict(redirector=True))
-            # Save concrete
-            self.sample_dict_concrete.update(sample.get_sample_dict(redirector=False))
-
-            if self.prefix:
-                #  If a storage prefix is specified, save also a local storage file
-                self.sample_dict_local.update(
-                    sample.get_sample_dict(redirector=True, prefix=self.prefix)
+            try:
+                sample = Sample(
+                    name=sname,
+                    das_names=scfg["das_names"],
+                    sample=self.sample,
+                    metadata=scfg["metadata"],
+                    sites_cfg=self.sites_cfg,
+                    sort_replicas=self.sort_replicas,
+                    **kwargs,
                 )
+                # Skip this sample if it has no valid files
+                if not sample.has_valid_files:
+                    print(f"\t Skipping sample {sname} - no valid files found")
+                    continue
+                    
+                self.samples_obj.append(sample)
+
+                # Save redirector
+                self.sample_dict_redirector.update(sample.get_sample_dict(redirector=True))
+                # Save concrete
+                self.sample_dict_concrete.update(sample.get_sample_dict(redirector=False))
+
+                if self.prefix:
+                    #  If a storage prefix is specified, save also a local storage file
+                    self.sample_dict_local.update(
+                        sample.get_sample_dict(redirector=True, prefix=self.prefix)
+                    )
+            except Exception as e:
+                print(f"\t ERROR: Failed to process sample {sname}: {e}")
+                print(f"\t Skipping this sample and continuing with the next one...")
+                continue
 
             if self.append_parents:
                 parents_names = sample.get_parentlist()

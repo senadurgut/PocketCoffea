@@ -44,6 +44,9 @@ def path_import(absolute_path):
     
 def load_config(cfg, do_load=True, save_config=True, outputdir=None):
     ''' Helper function to load a Configurator instance from a user defined python module'''
+    # Convert relative path to absolute path if needed
+    if not os.path.isabs(cfg):
+        cfg = os.path.abspath(cfg)
     config_module =  path_import(cfg)
     try:
         config = config_module.cfg
